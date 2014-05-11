@@ -43,6 +43,7 @@ namespace SCANsat
 		private static GUIStyle style_toggle;
 		private static GUIStyle style_overlay;
 		private static Font dotty;
+        private static string resource = "Kethane"; //Again with the this
 
 		/* UI: Colors and color information */
 		/* FIXME: move to PALETTE */
@@ -1182,7 +1183,26 @@ namespace SCANsat
 			if (GUILayout.Button ("Close")) {
 				bigmap_visible = false;
 			}
-			GUILayout.FlexibleSpace ();
+            if (GUILayout.Button("Rebuild Kethane")) //Rebuild Kethane cell database after background scanning
+            {
+                CelestialBody body = FlightGlobals.ActiveVessel.mainBody;
+                for (int ilat = 0; ilat < 180; ilat++)
+                {
+                    for (int ilon = 0; ilon < 360; ilon++)
+                    {
+                        if (data.isCovered(ilon - 180, ilat - 90, SCANdata.SCANtype.Kethane))
+                        {
+                            Kethane.Cell cell = bigmap.getKethaneCell(ilon - 180, ilat - 90);
+                            if (!Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                            {
+                                Kethane.KethaneData.Current.Scans[resource][body.name][cell] = true;
+                            }
+                        }
+                    }
+                }
+                bigmap.resetMap();
+            }
+            //GUILayout.FlexibleSpace ();
 			style_button.normal.textColor = Color.grey;
 			if (bigmap.isMapComplete ())
 				style_button.normal.textColor = Color.white;
@@ -1250,12 +1270,22 @@ namespace SCANsat
 				SCANcontroller.controller.map_asteroids = !SCANcontroller.controller.map_asteroids;
 			}
 			GUILayout.EndHorizontal ();
+            GUILayout.BeginHorizontal();
 
-			style_button.normal.textColor = SCANcontroller.controller.map_grid ? c_good : Color.white;
-			if (GUILayout.Button ("Grid" , style_button)) {
-				SCANcontroller.controller.map_grid = !SCANcontroller.controller.map_grid;
-				overlay_static_dirty = true;
-			}
+            style_button.normal.textColor = SCANcontroller.controller.map_grid ? c_good : Color.white;
+            if (GUILayout.Button("Grid", style_button))
+            {
+                SCANcontroller.controller.map_grid = !SCANcontroller.controller.map_grid;
+                overlay_static_dirty = true;
+            }
+
+            style_button.normal.textColor = SCANcontroller.controller.map_kethane ? c_good : Color.white;
+            if (GUILayout.Button("Kethane", style_button)) //Add Kethane overlay button
+            {
+                SCANcontroller.controller.map_kethane = !SCANcontroller.controller.map_kethane;
+                bigmap.resetMap();
+            }
+            GUILayout.EndHorizontal();
 			GUILayout.EndVertical ();
 
 			GUILayout.BeginVertical ();
@@ -1338,6 +1368,19 @@ namespace SCANsat
 					info += "\n" + toDMS (mlat , mlon) + " (lat: " + mlat.ToString ("F2") + " lon: " + mlon.ToString ("F2") + ") ";
 					if (in_spotmap)
 						info += " " + spotmap.mapscale.ToString ("F1") + "x";
+                    if (SCANcontroller.controller.map_kethane) //Add kethane resource amount in display
+                    {
+                        CelestialBody body = FlightGlobals.ActiveVessel.mainBody;
+                        Kethane.Cell cell = bigmap.getKethaneCell(data.icLON(mlon) - 180, data.icLAT(mlat) - 90);
+                        if (Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                        {
+                            Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(resource, body, cell);
+                            if (deposit != null)
+                                info += colored(XKCDColors.PukeGreen, "\n<b>" + resource + ": " + deposit.Quantity.ToString("N1") + "</b>");
+                            else
+                                info += colored(XKCDColors.PukeGreen, "\n<b>" + resource + ": none</b>");
+                        }
+                    }
 				} else {
 					info += " " + mlat.ToString ("F") + " " + mlon.ToString ("F"); // uncomment for debugging projections
 				}
