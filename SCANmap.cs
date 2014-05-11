@@ -229,6 +229,7 @@ namespace SCANsat
 			mapwidth = w;
 			mapscale = mapwidth / 360f;
 			mapheight = (int)(w / 2);
+            big_heightmap = new float[mapwidth, mapheight, 3];
 			map = null;
 			resetMap ();
 		}
@@ -250,6 +251,8 @@ namespace SCANsat
 		/* MAP: shared state */
 		public int mapmode = 0; // lots of EXTERNAL refs!
 		public Texture2D map; // refs above: 214,215,216,232, below, and JSISCANsatRPM.
+        protected float[, ,] big_heightmap; // Elevation data cache
+        public string resource = "Kethane"; // Probably needs to be stored in some form of settings file
 
 
 		/* MAP: internal state */
@@ -280,6 +283,18 @@ namespace SCANsat
 			resetMap ();
 		}
 
+        //** Store eleveation data in cache **//
+        public void heightMapArray(float height, int line, int i) {
+            big_heightmap[i, line, SCANcontroller.controller.projection] = height;
+        }
+
+        //** Fetch the Kethane cell for a given lat/long **//
+        public Kethane.Cell getKethaneCell(int ilon, int ilat) {
+            Vector3 pos = body.GetWorldSurfacePosition((double)ilat, (double)ilon, 50000);
+            Vector3 Wpos = body.transform.InverseTransformPoint(pos);
+            return Kethane.Cell.Containing(Wpos, 5);
+        }
+
 		/* MAP: export: PNG file */
 		public void exportPNG () {
 			string mode;
@@ -305,6 +320,13 @@ namespace SCANsat
 		/* MAP: build: map to Texture2D */
 		public Texture2D getPartialMap () {
 			SCANdata data = SCANcontroller.controller.getData (body);
+            int lastiLon = -182; // Values to reduce resulotion of Kethane grid
+            int lastmapstep = 0;
+            bool lastCellScanned = false;
+            bool lastCellFull = false;
+            Color KethaneFull = new Color(0.08235294f, 0.6901961f, 0.1019608f); // Colors for Kethane overlay
+            Color KethaneEmpty = new Color(0.1858824f, 0.3105883f, 0.1929412f);
+            Color baseColor = Color.grey; // Temporary color, allows for blending with Kethane overlay
 			Color[] pix;
 			if (map == null) {
 				map = new Texture2D (mapwidth , mapheight , TextureFormat.ARGB32 , false);
@@ -327,6 +349,8 @@ namespace SCANsat
 				mapstep = 0;
 				mapline = new double[map.width];
 			}
+
+            int mapstepScale = (int)(mapstep * (1.0f / mapscale)); // Further reduce resolution of Kethane grid
 			pix = map.GetPixels (0 , mapstep , map.width , 1);
 			for (int i=0; i<map.width; i++) {
 				int scheme = 0;
@@ -340,112 +364,343 @@ namespace SCANsat
 					pix [i] = Color.clear;
 					continue;
 				}
-				if (mapmode == 0) {
-					if (!data.isCovered (lon , lat , SCANdata.SCANtype.Altimetry))
-						continue;
-					if (body.pqsController == null) {
-						pix [i] = Color.Lerp (Color.black , Color.white , UnityEngine.Random.value);
-						continue;
-					}
-					float val;
-					if (data.isCovered (lon , lat , SCANdata.SCANtype.AltimetryHiRes)) {
-						// high resolution gets a coloured pixel for the actual position
-						val = (float)data.getElevation (lon , lat);
-						pix [i] = heightToColor (val , scheme);
-					} else {
-						// basic altimetry gets forced greyscale with lower resolution
-						val = (float)data.getElevation (((int)(lon * 5)) / 5 , ((int)(lat * 5)) / 5);
-						pix [i] = heightToColor (val , 1);
-					}
-					/* draw height lines - works, but mostly useless...
-				int step = (int)(val / 1000);
-				int step_h = step, step_v = step;
-				if(i > 0) step_h = (int)(bigline[i - 1] / 1000);
-				if(bigstep > 0) step_v = (int)(bigline[i] / 1000);
-				if(step != step_h || step != step_v) {
-					pix[i] = Color.white;
-				}
-				*/
-					mapline [i] = val;
-				} else if (mapmode == 1) {
-					if (!data.isCovered (lon , lat , SCANdata.SCANtype.Altimetry))
-						continue;
-					if (body.pqsController == null) {
-						pix [i] = Color.Lerp (Color.black , Color.white , UnityEngine.Random.value);
-						continue;
-					}
-					float val;
-					if (data.isCovered (lon , lat , SCANdata.SCANtype.AltimetryHiRes)) {
-						val = (float)data.getElevation (lon , lat);
-					} else {
-						val = (float)data.getElevation (((int)(lon * 5)) / 5 , ((int)(lat * 5)) / 5);
-					}
-					if (mapstep == 0) {
-						pix [i] = Color.grey;
-					} else {
-						// This doesn't actually calculate the slope per se, but it's faster
-						// than asking for yet more elevation data. Please don't use this
-						// code to operate nuclear power plants or rockets.
-						double v1 = mapline [i];
-						if (i > 0)
-							v1 = Math.Max (v1 , mapline [i - 1]);
-						if (i < mapline.Length - 1)
-							v1 = Math.Max (v1 , mapline [i + 1]);
-						float v = Mathf.Clamp ((float)Math.Abs (val - v1) / 1000f , 0 , 2f);
-						if (SCANcontroller.controller.colours == 1) {
-							pix [i] = Color.Lerp (Color.black , Color.white , v / 2f);
-						} else {
-							if (v < 1) {
-								pix [i] = Color.Lerp (XKCDColors.PukeGreen , XKCDColors.Lemon , v);
-							} else {
-								pix [i] = Color.Lerp (XKCDColors.Lemon , XKCDColors.OrangeRed , v - 1);
-							}
-						}
-					}
-					mapline [i] = val;
-				} else if (mapmode == 2) {
-					if (!data.isCovered (lon , lat , SCANdata.SCANtype.Biome))
-						continue;
-					if (body.BiomeMap == null || body.BiomeMap.Map == null) {
-						pix [i] = Color.Lerp (Color.black , Color.white , UnityEngine.Random.value);
-						continue;
-					}
-					/* // this just basically stretches the actual biome map to fit... it looks horrible
-				float u = ((lon + 360 + 180 + 90)) % 360;
-				float v = ((lat + 180 + 90)) % 180;
-				if(u < 0 || v < 0 || u >= 360 || v >= 180) continue;
-				u /= 360f; v /= 180f;
-				pix[i] = body.BiomeMap.Map.GetPixelBilinear(u, v);
-				*/
-					double bio = data.getBiomeIndexFraction (lon , lat);
-					Color biome = Color.grey;
-					if (SCANcontroller.controller.colours == 1) {
-						if ((i > 0 && mapline [i - 1] != bio) || (mapstep > 0 && mapline [i] != bio)) {
-							biome = Color.white;
-						} else {
-							biome = Color.Lerp (Color.black , Color.white , (float)bio);
-						}
-					} else {
-						Color elevation = Color.gray;
-						if (data.isCovered (lon , lat , SCANdata.SCANtype.Altimetry)) {
-							float val = (float)data.getElevation (lon , lat);
-							elevation = Color.Lerp (Color.black , Color.white , Mathf.Clamp (val + 1500f , 0 , 9000) / 9000f);
-						}
-						Color bio1 = XKCDColors.CamoGreen;
-						Color bio2 = XKCDColors.Marigold;
-						if ((i > 0 && mapline [i - 1] != bio) || (mapstep > 0 && mapline [i] != bio)) {
-							//biome = Color.Lerp(XKCDColors.Puce, elevation, 0.5f);
-							biome = Color.white;
-						} else {
-							biome = Color.Lerp (Color.Lerp (bio1 , bio2 , (float)bio) , elevation , 0.5f);
-						}
-					}
-
-					pix [i] = biome;
-					mapline [i] = bio;
-				}
-			}
-			map.SetPixels (0 , mapstep , map.width , 1 , pix);
+                if (mapmode == 0)
+                {
+                    if (!data.isCovered(lon, lat, SCANdata.SCANtype.Altimetry))
+                        continue;
+                    if (body.pqsController == null)
+                    {
+                        pix[i] = Color.Lerp(Color.black, Color.white, UnityEngine.Random.value);
+                        //big_heightmap[i, mapstep, SCANcontroller.controller.projection] = 0;
+                        continue;
+                    }
+                    float val = big_heightmap[i, mapstep, SCANcontroller.controller.projection];
+                    if (val == 0)
+                    {
+                        if (data.isCovered(lon, lat, SCANdata.SCANtype.AltimetryHiRes))
+                        {
+                            // high resolution gets a coloured pixel for the actual position
+                            val = (float)data.getElevation(lon, lat);
+                            baseColor = heightToColor(val, scheme); // Set temporary color
+                            //pix[i] = heightToColor(val, scheme);
+                            heightMapArray(val, mapstep, i);
+                        }
+                        else
+                        {
+                            // basic altimetry gets forced greyscale with lower resolution
+                            val = (float)data.getElevation(((int)(lon * 5)) / 5, ((int)(lat * 5)) / 5);
+                            baseColor = heightToColor(val, 1);
+                            //pix[i] = heightToColor(val, 1);
+                            heightMapArray(val, mapstep, i);
+                        }
+                    }
+                    else if (val != 0)
+                    {
+                        if (data.isCovered(lon, lat, SCANdata.SCANtype.AltimetryHiRes))
+                        {
+                            baseColor = heightToColor(val, scheme);
+                            //pix[i] = heightToColor(val, scheme);
+                        }
+                        else
+                        {
+                            baseColor = heightToColor(val, 1);
+                            //pix[i] = heightToColor(val, 1);
+                        }
+                    }
+                    if (SCANcontroller.controller.map_kethane) //Check for kethane button on the map, repeat for each map type
+                    {
+                        int ilon = data.icLON(lon) - 180;
+                        int ilat = data.icLAT(lat) - 90;
+                        if (mapstepScale >= lastmapstep + 1)
+                        { //Polar projection is screwy
+                            if (ilon > lastiLon + 1 || SCANcontroller.controller.projection == 2)
+                            {
+                                lastiLon = ilon;
+                                Kethane.Cell cell = getKethaneCell(ilon, ilat); //Get cell below given position
+                                if (Kethane.KethaneData.Current.Scans[resource][body.name][cell]) //Check if cell has been scanned
+                                {
+                                    lastCellScanned = true;
+                                    Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(resource, body, cell);
+                                    if (deposit != null) //Check if cell has resources
+                                    {
+                                        lastCellFull = true;
+                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f); //Blend base color with Kethane overlay
+                                    }
+                                    else
+                                    {
+                                        lastCellFull = false;
+                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    }
+                                }
+                                else
+                                {
+                                    lastCellScanned = false;
+                                    pix[i] = baseColor;
+                                }
+                            }
+                            else if (lastCellScanned)
+                            {
+                                if (lastCellFull) //Crude method for reducing overlay resolution
+                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                else
+                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                            }
+                            else
+                                pix[i] = baseColor;
+                        }
+                        else if (lastCellScanned)
+                        {
+                            if (lastCellFull)
+                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                            else
+                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                        }
+                        else
+                            pix[i] = baseColor;
+                    }
+                    else
+                        pix[i] = baseColor;
+                    /* draw height lines - works, but mostly useless...
+                int step = (int)(val / 1000);
+                int step_h = step, step_v = step;
+                if(i > 0) step_h = (int)(bigline[i - 1] / 1000);
+                if(bigstep > 0) step_v = (int)(bigline[i] / 1000);
+                if(step != step_h || step != step_v) {
+                    pix[i] = Color.white;
+                }
+                */
+                    mapline[i] = val;
+                }
+                else if (mapmode == 1)
+                {
+                    if (!data.isCovered(lon, lat, SCANdata.SCANtype.Altimetry))
+                        continue;
+                    if (body.pqsController == null)
+                    {
+                        pix[i] = Color.Lerp(Color.black, Color.white, UnityEngine.Random.value);
+                        continue;
+                    }
+                    float val = big_heightmap[i, mapstep, SCANcontroller.controller.projection];
+                    if (val == 0)
+                    {
+                        if (data.isCovered(lon, lat, SCANdata.SCANtype.AltimetryHiRes))
+                        {
+                            val = (float)data.getElevation(lon, lat);
+                            heightMapArray(val, mapstep, i);
+                        }
+                        else
+                        {
+                            val = (float)data.getElevation(((int)(lon * 5)) / 5, ((int)(lat * 5)) / 5);
+                            heightMapArray(val, mapstep, i);
+                        }
+                    }
+                    if (mapstep == 0)
+                    {
+                        baseColor = Color.grey;
+                    }
+                    else
+                    {
+                        // This doesn't actually calculate the slope per se, but it's faster
+                        // than asking for yet more elevation data. Please don't use this
+                        // code to operate nuclear power plants or rockets.
+                        double v1 = mapline[i];
+                        if (i > 0)
+                            v1 = Math.Max(v1, mapline[i - 1]);
+                        if (i < mapline.Length - 1)
+                            v1 = Math.Max(v1, mapline[i + 1]);
+                        float v = Mathf.Clamp((float)Math.Abs(val - v1) / 1000f, 0, 2f);
+                        if (SCANcontroller.controller.colours == 1)
+                        {
+                            baseColor = Color.Lerp(Color.black, Color.white, v / 2f);
+                        }
+                        else
+                        {
+                            if (v < 1)
+                            {
+                                baseColor = Color.Lerp(XKCDColors.PukeGreen, XKCDColors.Lemon, v);
+                            }
+                            else
+                            {
+                                baseColor = Color.Lerp(XKCDColors.Lemon, XKCDColors.OrangeRed, v - 1);
+                            }
+                        }
+                    }
+                    if (SCANcontroller.controller.map_kethane)
+                    {
+                        int ilon = data.icLON(lon) - 180;
+                        int ilat = data.icLAT(lat) - 90;
+                        if (mapstepScale >= lastmapstep + 1)
+                        {
+                            if (ilon > lastiLon + 1 || SCANcontroller.controller.projection == 2)
+                            {
+                                lastiLon = ilon;
+                                Kethane.Cell cell = getKethaneCell(ilon, ilat);
+                                if (Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                                {
+                                    lastCellScanned = true;
+                                    Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(resource, body, cell);
+                                    if (deposit != null)
+                                    {
+                                        lastCellFull = true;
+                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                    }
+                                    else
+                                    {
+                                        lastCellFull = false;
+                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    }
+                                }
+                                else
+                                {
+                                    lastCellScanned = false;
+                                    pix[i] = baseColor;
+                                }
+                            }
+                            else if (lastCellScanned)
+                            {
+                                if (lastCellFull)
+                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                else
+                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                            }
+                            else
+                                pix[i] = baseColor;
+                        }
+                        else if (lastCellScanned)
+                        {
+                            if (lastCellFull)
+                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                            else
+                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                        }
+                        else
+                            pix[i] = baseColor;
+                    }
+                    else
+                        pix[i] = baseColor;
+                    mapline[i] = val;
+                }
+                else if (mapmode == 2)
+                {
+                    if (!data.isCovered(lon, lat, SCANdata.SCANtype.Biome))
+                        continue;
+                    if (body.BiomeMap == null || body.BiomeMap.Map == null)
+                    {
+                        pix[i] = Color.Lerp(Color.black, Color.white, UnityEngine.Random.value);
+                        continue;
+                    }
+                    /* // this just basically stretches the actual biome map to fit... it looks horrible
+                float u = ((lon + 360 + 180 + 90)) % 360;
+                float v = ((lat + 180 + 90)) % 180;
+                if(u < 0 || v < 0 || u >= 360 || v >= 180) continue;
+                u /= 360f; v /= 180f;
+                pix[i] = body.BiomeMap.Map.GetPixelBilinear(u, v);
+                */
+                    double bio = data.getBiomeIndexFraction(lon, lat);
+                    Color biome = Color.grey;
+                    if (SCANcontroller.controller.colours == 1)
+                    {
+                        if ((i > 0 && mapline[i - 1] != bio) || (mapstep > 0 && mapline[i] != bio))
+                        {
+                            biome = Color.white;
+                        }
+                        else
+                        {
+                            biome = Color.Lerp(Color.black, Color.white, (float)bio);
+                        }
+                    }
+                    else
+                    {
+                        Color elevation = Color.gray;
+                        if (data.isCovered(lon, lat, SCANdata.SCANtype.Altimetry))
+                        {
+                            float val = big_heightmap[i, mapstep, SCANcontroller.controller.projection];
+                            if (val == 0)
+                            {
+                                if (data.isCovered(lon, lat, SCANdata.SCANtype.AltimetryHiRes))
+                                {
+                                    val = (float)data.getElevation(lon, lat);
+                                    heightMapArray(val, mapstep, i);
+                                }
+                                else
+                                {
+                                    val = (float)data.getElevation(((int)(lon * 5)) / 5, ((int)(lat * 5)) / 5);
+                                    heightMapArray(val, mapstep, i);
+                                }
+                            }
+                            elevation = Color.Lerp(Color.black, Color.white, Mathf.Clamp(val + 1500f, 0, 9000) / 9000f);
+                        }
+                        Color bio1 = XKCDColors.CamoGreen;
+                        Color bio2 = XKCDColors.Marigold;
+                        if ((i > 0 && mapline[i - 1] != bio) || (mapstep > 0 && mapline[i] != bio))
+                        {
+                            //biome = Color.Lerp(XKCDColors.Puce, elevation, 0.5f);
+                            biome = Color.white;
+                        }
+                        else
+                        {
+                            biome = Color.Lerp(Color.Lerp(bio1, bio2, (float)bio), elevation, 0.5f);
+                        }
+                    }
+                    baseColor = biome;
+                    if (SCANcontroller.controller.map_kethane)
+                    {
+                        int ilon = data.icLON(lon) - 180;
+                        int ilat = data.icLAT(lat) - 90;
+                        if (mapstepScale >= lastmapstep + 1)
+                        {
+                            if (ilon > lastiLon + 1 || SCANcontroller.controller.projection == 2)
+                            {
+                                lastiLon = ilon;
+                                Kethane.Cell cell = getKethaneCell(ilon, ilat);
+                                if (Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                                {
+                                    lastCellScanned = true;
+                                    Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(resource, body, cell);
+                                    if (deposit != null)
+                                    {
+                                        lastCellFull = true;
+                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                    }
+                                    else
+                                    {
+                                        lastCellFull = false;
+                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    }
+                                }
+                                else
+                                {
+                                    lastCellScanned = false;
+                                    pix[i] = baseColor;
+                                }
+                            }
+                            else if (lastCellScanned)
+                            {
+                                if (lastCellFull)
+                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                else
+                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                            }
+                            else
+                                pix[i] = baseColor;
+                        }
+                        else if (lastCellScanned)
+                        {
+                            if (lastCellFull)
+                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                            else
+                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                        }
+                        else
+                            pix[i] = baseColor;
+                    }
+                    else
+                        pix[i] = baseColor;
+                    mapline[i] = bio;
+                }
+            }
+            map.SetPixels(0, mapstep, map.width, 1, pix);
+            lastmapstep = mapstepScale;
 			mapstep++;
 			if (mapstep % 10 == 0 || mapstep >= map.height)
 				map.Apply ();
