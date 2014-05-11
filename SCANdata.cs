@@ -19,8 +19,8 @@ namespace SCANsat
 	{
 		/* MAP: anonymous functions (in place of preprocessor macros */
 		// icLON and icLAT: [i]nteger casted, [c]lamped, longitude and latitude
-		Func<double,int> icLON = (lon) => ((int)(lon + 360 + 180)) % 360;
-		Func<double,int> icLAT = (lat) => ((int)(lat + 180 + 90 )) % 180;
+		internal Func<double,int> icLON = (lon) => ((int)(lon + 360 + 180)) % 360;
+		internal Func<double,int> icLAT = (lat) => ((int)(lat + 180 + 90 )) % 180;
 		Func<int,int,bool> badLonLat = (lon,lat) => (lon < 0 || lat < 0 || lon >= 360 || lat >= 180);
 
 		/* MAP: state */
@@ -37,7 +37,7 @@ namespace SCANsat
 			AltimetryLoRes = 1, // low resolution altimetry (limited zoom)
 			AltimetryHiRes = 2, // high resolution altimetry (unlimited zoom)
 			Altimetry = 3, 	// both (setting) or either (testing) altimetry
-			//Slope = 4,		// slope data
+            Kethane = 4,		// Replace old slope scanner with Kethane scanner
 			Biome = 8,		// biome data
 			Anomaly = 16,		// anomalies (position of anomaly)
 			AnomalyDetail = 32,	// anomaly detail (name of anomaly, etc.)
