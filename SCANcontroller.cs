@@ -65,6 +65,12 @@ namespace SCANsat
 		public bool scan_background = true;
 		[KSPField(isPersistant = true)]
 		public int timeWarpResolution = 20;
+        //[KSPField(isPersistant = true)]
+        //public string overlayResource = "Kethane";
+        [KSPField(isPersistant = true)]
+        public bool gridOverlay = true;
+        [KSPField(isPersistant = true)]
+        public int gridSelection = 0;
 
 		public override void OnLoad(ConfigNode node) {
 			ConfigNode node_vessels = node.GetNode("Scanners");
@@ -104,6 +110,7 @@ namespace SCANsat
 					body_data.disabled = Convert.ToBoolean(node_body.GetValue("Disabled"));
 				}
 			}
+            OverlayResources();
 		}
 
 		public override void OnSave(ConfigNode node) {
@@ -157,6 +164,31 @@ namespace SCANsat
 			public int frame;
 			public double lastUT;
 		}
+
+        internal List<string> KethaneResources = new List<string>();
+
+        private void OverlayResources()
+        {
+            foreach (ConfigNode node in GameDatabase.Instance.GetConfigNodes("KethaneResource"))
+            {
+                string resourceName = node.GetValue("Resource");
+                KethaneResources.Add(resourceName);
+            }
+        }
+
+        internal Color gridColor(string resource)
+        {
+            Color gridcolor = Color.white;
+            foreach (ConfigNode node in GameDatabase.Instance.GetConfigNodes("KethaneResource"))
+            {
+                if (node.GetValue("Resource") == resource)
+                {
+                    var color = node.GetValue("ColorFull");
+                    gridcolor = ConfigNode.ParseColor(color);
+                }
+            }
+            return gridcolor;
+        }
 
 		protected Dictionary<Guid, SCANvessel> knownVessels = new Dictionary<Guid, SCANvessel>();
 
