@@ -118,6 +118,7 @@ namespace SCANsat
                 Actions["startScanAction"].guiName = "Start " + scanName;
                 Actions["stopScanAction"].guiName = "Stop " + scanName;
                 Actions["toggleScanAction"].guiName = "Toggle " + scanName;
+                Events["analyze"].active = true;
             }
             if (scanning) startScan();
         }
