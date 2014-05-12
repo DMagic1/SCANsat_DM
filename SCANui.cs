@@ -43,7 +43,7 @@ namespace SCANsat
 		private static GUIStyle style_toggle;
 		private static GUIStyle style_overlay;
 		private static Font dotty;
-        private static string resource = "Kethane"; //Again with the this
+        //private static string resource = SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection]; //Again with the this
 
 		/* UI: Colors and color information */
 		/* FIXME: move to PALETTE */
@@ -672,6 +672,14 @@ namespace SCANsat
 			}
 			GUILayout.EndHorizontal ();
 
+            // resources overlay
+            GUILayout.Space(16);
+            GUILayout.Label("Resources Overlay", style_headline);
+            GUILayout.BeginHorizontal();
+            SCANcontroller.controller.gridOverlay = GUILayout.Toggle(SCANcontroller.controller.gridOverlay, "Activate Kethane grid overlay");
+            SCANcontroller.controller.gridSelection = GUILayout.SelectionGrid(SCANcontroller.controller.gridSelection, SCANcontroller.controller.KethaneResources.ToArray(), 3);
+            GUILayout.EndHorizontal();
+
 			// background scanning
 			GUILayout.Space (16);
 			GUILayout.Label ("Background Scanning" , style_headline);
@@ -1183,26 +1191,29 @@ namespace SCANsat
 			if (GUILayout.Button ("Close")) {
 				bigmap_visible = false;
 			}
-            if (GUILayout.Button("Rebuild Kethane")) //Rebuild Kethane cell database after background scanning
+            if (SCANcontroller.controller.gridOverlay)
             {
-                CelestialBody body = FlightGlobals.ActiveVessel.mainBody;
-                for (int ilat = 0; ilat < 180; ilat++)
+                if (GUILayout.Button("Rebuild Grid")) //Rebuild Kethane cell database after background scanning
                 {
-                    for (int ilon = 0; ilon < 360; ilon++)
+                    CelestialBody body = FlightGlobals.ActiveVessel.mainBody;
+                    for (int ilat = 0; ilat < 180; ilat++)
                     {
-                        if (data.isCovered(ilon - 180, ilat - 90, SCANdata.SCANtype.Kethane))
+                        for (int ilon = 0; ilon < 360; ilon++)
                         {
-                            Kethane.Cell cell = bigmap.getKethaneCell(ilon - 180, ilat - 90);
-                            if (!Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                            if (data.isCovered(ilon - 180, ilat - 90, SCANdata.SCANtype.Kethane))
                             {
-                                Kethane.KethaneData.Current.Scans[resource][body.name][cell] = true;
+                                Kethane.Cell cell = bigmap.getKethaneCell(ilon - 180, ilat - 90);
+                                if (!Kethane.KethaneData.Current.Scans[SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection]][body.name][cell])
+                                {
+                                    Kethane.KethaneData.Current.Scans[SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection]][body.name][cell] = true;
+                                }
                             }
                         }
                     }
+                    bigmap.resetMap();
                 }
-                bigmap.resetMap();
             }
-            //GUILayout.FlexibleSpace ();
+            else GUILayout.FlexibleSpace ();
 			style_button.normal.textColor = Color.grey;
 			if (bigmap.isMapComplete ())
 				style_button.normal.textColor = Color.white;
@@ -1279,11 +1290,14 @@ namespace SCANsat
                 overlay_static_dirty = true;
             }
 
-            style_button.normal.textColor = SCANcontroller.controller.map_kethane ? c_good : Color.white;
-            if (GUILayout.Button("Kethane", style_button)) //Add Kethane overlay button
+            if (SCANcontroller.controller.gridOverlay)
             {
-                SCANcontroller.controller.map_kethane = !SCANcontroller.controller.map_kethane;
-                bigmap.resetMap();
+                style_button.normal.textColor = SCANcontroller.controller.map_kethane ? c_good : Color.white;
+                if (GUILayout.Button(SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection], style_button)) //Add Kethane overlay button
+                {
+                    SCANcontroller.controller.map_kethane = !SCANcontroller.controller.map_kethane;
+                    bigmap.resetMap();
+                }
             }
             GUILayout.EndHorizontal();
 			GUILayout.EndVertical ();
@@ -1372,13 +1386,13 @@ namespace SCANsat
                     {
                         CelestialBody body = FlightGlobals.ActiveVessel.mainBody;
                         Kethane.Cell cell = bigmap.getKethaneCell(data.icLON(mlon) - 180, data.icLAT(mlat) - 90);
-                        if (Kethane.KethaneData.Current.Scans[resource][body.name][cell])
+                        if (Kethane.KethaneData.Current.Scans[SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection]][body.name][cell])
                         {
-                            Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(resource, body, cell);
+                            Kethane.ICellResource deposit = Kethane.KethaneData.Current.GetCellDeposit(SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection], body, cell);
                             if (deposit != null)
-                                info += colored(XKCDColors.PukeGreen, "\n<b>" + resource + ": " + deposit.Quantity.ToString("N1") + "</b>");
+                                info += colored(XKCDColors.PukeGreen, "\n<b>" + SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection] + ": " + deposit.Quantity.ToString("N1") + "</b>");
                             else
-                                info += colored(XKCDColors.PukeGreen, "\n<b>" + resource + ": none</b>");
+                                info += colored(XKCDColors.PukeGreen, "\n<b>" + SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection] + ": none</b>");
                         }
                     }
 				} else {
