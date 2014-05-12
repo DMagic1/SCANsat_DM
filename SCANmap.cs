@@ -252,7 +252,7 @@ namespace SCANsat
 		public int mapmode = 0; // lots of EXTERNAL refs!
 		public Texture2D map; // refs above: 214,215,216,232, below, and JSISCANsatRPM.
         protected float[, ,] big_heightmap; // Elevation data cache
-        public string resource = "Kethane"; // Probably needs to be stored in some form of settings file
+        //public string resource = "Kethane"; // Probably needs to be stored in some form of settings file
 
 
 		/* MAP: internal state */
@@ -261,6 +261,8 @@ namespace SCANsat
 		protected double[] mapline; // all refs are below
 		protected CelestialBody body; // all refs are below
 		protected Color[] redline; // all refs are below
+        internal Color gridFull;
+        internal Color gridEmpty = new Color(0.5f, 0.5f, 0.5f);
 
 		/* MAP: nearly trivial functions */
 		public void setBody ( CelestialBody b ) {
@@ -276,6 +278,7 @@ namespace SCANsat
 		}
 		public void resetMap () {
 			mapstep = 0;
+            gridFull = SCANcontroller.controller.gridColor(SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection]);
 			mapsaved = false;
 		}
 		public void resetMap ( int mode ) {
@@ -324,8 +327,9 @@ namespace SCANsat
             int lastmapstep = 0;
             bool lastCellScanned = false;
             bool lastCellFull = false;
-            Color KethaneFull = new Color(0.08235294f, 0.6901961f, 0.1019608f); // Colors for Kethane overlay
-            Color KethaneEmpty = new Color(0.1858824f, 0.3105883f, 0.1929412f);
+            string resource = SCANcontroller.controller.KethaneResources[SCANcontroller.controller.gridSelection];
+            //Color KethaneFull = new Color(0.08235294f, 0.6901961f, 0.1019608f); // Colors for Kethane overlay
+            //Color KethaneEmpty = new Color(0.1858824f, 0.3105883f, 0.1929412f);
             Color baseColor = Color.grey; // Temporary color, allows for blending with Kethane overlay
 			Color[] pix;
 			if (map == null) {
@@ -424,12 +428,12 @@ namespace SCANsat
                                     if (deposit != null) //Check if cell has resources
                                     {
                                         lastCellFull = true;
-                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f); //Blend base color with Kethane overlay
+                                        pix[i] = Color.Lerp(gridFull, baseColor, 0.2f); //Blend base color with Kethane overlay
                                     }
                                     else
                                     {
                                         lastCellFull = false;
-                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                        pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                                     }
                                 }
                                 else
@@ -441,9 +445,9 @@ namespace SCANsat
                             else if (lastCellScanned)
                             {
                                 if (lastCellFull) //Crude method for reducing overlay resolution
-                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                    pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                                 else
-                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                             }
                             else
                                 pix[i] = baseColor;
@@ -451,9 +455,9 @@ namespace SCANsat
                         else if (lastCellScanned)
                         {
                             if (lastCellFull)
-                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                             else
-                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                         }
                         else
                             pix[i] = baseColor;
@@ -542,12 +546,12 @@ namespace SCANsat
                                     if (deposit != null)
                                     {
                                         lastCellFull = true;
-                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                        pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                                     }
                                     else
                                     {
                                         lastCellFull = false;
-                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                        pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                                     }
                                 }
                                 else
@@ -559,9 +563,9 @@ namespace SCANsat
                             else if (lastCellScanned)
                             {
                                 if (lastCellFull)
-                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                    pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                                 else
-                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                             }
                             else
                                 pix[i] = baseColor;
@@ -569,9 +573,9 @@ namespace SCANsat
                         else if (lastCellScanned)
                         {
                             if (lastCellFull)
-                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                             else
-                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                         }
                         else
                             pix[i] = baseColor;
@@ -660,12 +664,12 @@ namespace SCANsat
                                     if (deposit != null)
                                     {
                                         lastCellFull = true;
-                                        pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                        pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                                     }
                                     else
                                     {
                                         lastCellFull = false;
-                                        pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                        pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                                     }
                                 }
                                 else
@@ -677,9 +681,9 @@ namespace SCANsat
                             else if (lastCellScanned)
                             {
                                 if (lastCellFull)
-                                    pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                    pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                                 else
-                                    pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                    pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                             }
                             else
                                 pix[i] = baseColor;
@@ -687,9 +691,9 @@ namespace SCANsat
                         else if (lastCellScanned)
                         {
                             if (lastCellFull)
-                                pix[i] = Color.Lerp(KethaneFull, baseColor, 0.2f);
+                                pix[i] = Color.Lerp(gridFull, baseColor, 0.2f);
                             else
-                                pix[i] = Color.Lerp(KethaneEmpty, baseColor, 0.4f);
+                                pix[i] = Color.Lerp(gridEmpty, baseColor, 0.4f);
                         }
                         else
                             pix[i] = baseColor;
