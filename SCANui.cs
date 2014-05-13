@@ -1382,8 +1382,6 @@ namespace SCANsat
 					if (bigmap_dragging) {
 					} else if (Event.current.button == 1) {
 						if (in_map || in_spotmap) {
-                            if (bigmap.isMapComplete())
-                            {
 							if (spotmap == null) {
 								spotmap = new SCANmap ();
 								spotmap.setSize (180 , 180);
@@ -1407,18 +1405,14 @@ namespace SCANsat
 								pos_spotmap.x = Math.Max (maprect.x , Math.Min (maprect.x + maprect.width - pos_spotmap.width , pos_spotmap.x));
 								pos_spotmap.y = Math.Max (maprect.y , Math.Min (maprect.y + maprect.height - pos_spotmap.height , pos_spotmap.y));
 							}
-                            }
 						}
 					} else if (Event.current.button == 0) {
 						if (spotmap != null && in_spotmap) {
-                            if (bigmap.isMapComplete())
-                            {
 							spotmap.mapscale = spotmap.mapscale / 1.25f;
 							if (spotmap.mapscale < 10)
 								spotmap.mapscale = 10;
 							spotmap.resetMap (spotmap.mapmode, 1);
 							Event.current.Use ();
-                            }
 						}
 					}
 					Event.current.Use ();
