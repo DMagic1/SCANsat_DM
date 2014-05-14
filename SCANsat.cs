@@ -96,21 +96,28 @@ namespace SCANsat
             {
                Events["startScan"].guiName = "Open Map";
                Events["stopScan"].guiName = "Close Map";
-			Events["analyze"].active = false;
+			   Events["analyze"].active = false;
                Actions["startScanAction"].guiName = "Open Map";
                Actions["stopScanAction"].guiName = "Close Map";
                Actions["toggleScanAction"].guiName = "Toggle Map";
+               Actions["analyzeData"].active = false;
             }
             else if (scanName != null)
             {
                Events["startScan"].guiName = "Start " + scanName;
                Events["stopScan"].guiName = "Stop " + scanName;
-			Events["analyze"].active = true;
+			   Events["analyze"].active = true;
                Actions["startScanAction"].guiName = "Start " + scanName;
                Actions["stopScanAction"].guiName = "Stop " + scanName;
                Actions["toggleScanAction"].guiName = "Toggle " + scanName;
+               if (sensorType == 32) //No need for these buttons on the BTDT
+               {
+                   Events["analyze"].active = false;
+                   Actions["analyzeData"].active = false;
+               }
             }
             if (scanning) startScan();
+            powerIsProblem = false; //Just to make sure this doesn't persist from bugged vessels
         }
         	public override void OnLoad(ConfigNode node)
         {
@@ -185,6 +192,7 @@ namespace SCANsat
 		[KSPEvent(guiActive = true, guiName = "Stop RADAR Scan", active = true)]
 		public void stopScan () {
             unregisterScanner ();
+            powerIsProblem = false; //Stops the onUpdate loop from continuing to cycle through
             //scanning = false;
             //if (sensorType > 0) {
             //    SCANcontroller.controller.unregisterSensor (vessel , (SCANdata.SCANtype)sensorType);
