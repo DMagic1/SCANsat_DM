@@ -82,7 +82,6 @@ namespace SCANsat
 		public MapProjection projection = MapProjection.Rectangular;
 
 		protected float[,,] big_heightmap;
-        protected int mapType;
         
 
         	public void heightMapArray (float height, int line, int i, int type)
@@ -242,6 +241,7 @@ namespace SCANsat
 			mapwidth = w;
 			mapscale = mapwidth / 360f;
 			mapheight = (int)(w / 2);
+            cacheBody = body;
 			big_heightmap = new float [mapwidth, mapheight, 3];
 			map = null;
 			resetMap ();
@@ -272,6 +272,8 @@ namespace SCANsat
 		protected double[] mapline; // all refs are below
 		protected CelestialBody body; // all refs are below
 		protected Color[] redline; // all refs are below
+        private CelestialBody cacheBody;
+        protected int mapType;
 
 		/* MAP: nearly trivial functions */
 		public void setBody ( CelestialBody b ) {
@@ -321,6 +323,11 @@ namespace SCANsat
 		public Texture2D getPartialMap () {
 			SCANdata data = SCANcontroller.controller.getData (body);
 			Color[] pix;
+            if (cacheBody != body)
+            {
+                if (mapType == 0) big_heightmap = new float [mapwidth, mapheight, 3];
+                cacheBody = body;
+            }
 			if (map == null) {
 				map = new Texture2D (mapwidth , mapheight , TextureFormat.ARGB32 , false);
 				pix = map.GetPixels ();
